@@ -1,0 +1,138 @@
+Thought for 17s
+Cron job — simplu, nu e complicat
+
+Pentru context "internship project", nu ai nevoie de infrastructură separată (Celery, cron de sistem). Cea mai simplă și mai curată soluție:
+
+APScheduler (AsyncIOScheduler) pornit direct în main.py la startup-ul aplicației FastAPI — rulează un job la interval fix (ex: o dată pe zi) care șterge:
+
+idempotency_keys cu expires_at trecut
+webhook_events procesate mai vechi de X zile (păstrezi un istoric scurt, nu la infinit)
+
+E ~15-20 linii de cod, o singură dependență nouă în requirements.txt, și arată bine la interviu ("job-uri periodice de curățare, integrate cu lifecycle-ul aplicației FastAPI, nu proces extern separat"). Îl punem în app/services/cleanup.py sau într-un fișier propriu app/scheduler.py.
+
+Nume proiect
+
+Câteva opțiuni, consistente cu stilul event-booking-api:
+
+banking-payments-api — clar, descriptiv
+ledger-api — sună mai "fintech serios", dar poate fi puțin ambiguu
+core-banking-api — sună impresionant dar poate părea pretențios pentru scope-ul real
+
+Recomandarea mea: banking-payments-api — descriptiv, ușor de înțeles dintr-o privire în CV/GitHub, fără pretenții pe care proiectul nu le susține.
+
+ERD
+
+Câteva note pe ERD:
+
+Accounts.user_id — relație 1-la-1 cu user-ul (fiecare user are un singur cont), simplu cum am discutat, fără multi-cont per user.
+Transactions.idempotency_key_id — leagă tranzacția de cheia care a creat-o, ca să poți urmări direct în DB "acest payment a fost creat prin acest request idempotent".
+Transactions ↔ WebhookEvents — relație opțională (o|), pentru că o tranzacție poate fi pending fără să fi primit încă webhook de confirmare.
+WebhookEvents.event_id — cheia de idempotency pentru inbound (unique constraint), ca provider-ul extern (simulat prin Postman) să nu poată declanșa procesare dublă dacă trimite același eveniment de 2 ori.
+Pașii de construcție (16h, ordonați pentru pull request-uri separate)
+#	Pas	Ce conține	Timp est.
+1	Setup proiect	venv, structură foldere, pyproject.toml, requirements.txt, .gitignore, .env/.env.example, git init + commit inițial	1h
+2	Config + Database	config.py (Pydantic Settings), database.py (async engine + session, asyncpg), test conexiune la Postgres (creat prin pgAdmin)	1h
+3	Alembic init	configurare async pentru Alembic, env.py adaptat, prima migrare goală ca test	0.5h
+4	Models: User + Account	models/user.py, models/account.py + migrare	1h
+5	Security + Auth	security.py (hash, JWT access/refresh), schemas/auth.py, routers/auth.py (register/login/refresh/logout), dependencies.py (get_current_user)	2.5h
+6	Limiter	limiter.py (slowapi), aplicat pe login/register	0.5h
+7	Account router	GET /accounts/me/balance, GET /accounts/me/statistics	1h
+8	Model IdempotencyKey + service	models/idempotency_key.py + migrare, services/idempotency.py (check/save, tratare race condition)	1.5h
+9	Model Transaction + schemas	models/transaction.py + migrare, schemas/transaction.py	1h
+10	Endpoint POST /payments	integrare idempotency, creare tranzacție pending, verificare/rezervare balanță (row-level locking)	2h
+11	Model WebhookEvent + signature service	models/webhook_event.py + migrare, services/webhook_signature.py (HMAC generate/verify)	1h
+12	Endpoint webhook inbound	POST /webhooks/payment-confirmation, verificare HMAC, idempotency pe event_id, update tranzacție + balanță	1.5h
+13	GET /transactions	listare + filtre (dată, sumă, status)	0.5h
+14	Cron cleanup	APScheduler în main.py, job periodic pentru idempotency_keys expirate + webhook_events vechi	0.5h
+15	Postman	colecție de request-uri (auth, payment, webhook simulat semnat HMAC), export JSON în /postman	0.5h
+16	Tests + README	teste esențiale (idempotency dublu request, webhook signature invalid, balanță insuficientă), README final	1.5h
+
+Total: ~16h — exact pe limită, deci dacă apare full-text search pe parcurs (pas opțional, ai zis pe drum), îl bagi ca extensie la pasul 13 (GET /transactions?search=...), separat, fără să afecteze restul planului.
+
+Fiecare pas = un branch/PR separat, exact cum lucrezi. Vrei să trecem acum la Pasul 1 concret (structura de foldere + conținutul pyproject.toml/requirements.txt), sau mai discutăm ceva la nivel de plan înainte?
+
+deci in primul ca sa stii ca inainte de fiecare test eu iti voi da detalii in plus de c edoresc si tu poti de aseemena sa ma intrebi inainte (te voi ruga doar sa mi scrii babeste ,a dica da git , dupa scrie asta , dupa asta , dupa git commit etc , ca sa nu gresesc), vreau doar sa ma intrebi tu inainte chestii ca sa te ajute sa mearga repede constructia aplicatiei
+
+Thought for 6s
+
+Perfect, așa lucrăm — la fiecare pas îmi dai detalii suplimentare dacă ai, eu te întreb dacă am nevoie de ceva înainte să încep, și îți dau instrucțiuni pas-cu-pas, explicit, tip rețetă (comandă → ce faci → git add → git commit etc.), ca să nu ratezi nimic.
+
+Înainte de Pasul 1, am nevoie de câteva detalii ca să-ți dau comenzile exacte, nu generice:
+
+Ce sistem de operare / terminal folosești pentru dezvoltare?
+Windows (PowerShell)
+Repo-ul de pe GitHub pentru acest proiect există deja (creat gol) sau pornim de la zero local?
+Pornim local cu git init, îl leg de GitHub după
+Pentru gestionarea pachetelor Python, ce preferăm?
+pip clasic + venv + requirements.txt (ca la proiectul 1)
+
+Perfect, avem tot ce ne trebuie. Hai pas cu pas, exact ca o rețetă — copiezi comenzile în PowerShell, eu îți explic ce face fiecare.
+
+Pasul 1: Setup proiect
+1.1 — Creezi folderul proiectului și intri în el
+powershell
+mkdir banking-payments-api
+cd banking-payments-api
+1.2 — Inițializezi git (local, îl legăm de GitHub la final)
+powershell
+git init
+1.3 — Creezi mediul virtual și îl activezi
+powershell
+python -m venv venv
+venv\Scripts\Activate.ps1
+
+Dacă PowerShell îți dă eroare de "execution policy" la activare, rulează o singură dată (ca administrator, sau normal dacă ai permisiuni):
+
+powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+apoi reîncerci activarea.
+
+După activare, ar trebui să vezi (venv) la începutul liniei de comandă în terminal — asta confirmă că e activ.
+
+1.4 — Creezi structura de foldere
+powershell
+mkdir app
+mkdir app\models
+mkdir app\schemas
+mkdir app\routers
+mkdir app\services
+mkdir app\middlewares
+mkdir tests
+mkdir postman
+1.5 — Creezi fișierele goale de bază în app/
+powershell
+New-Item app\__init__.py
+New-Item app\main.py
+New-Item app\config.py
+New-Item app\database.py
+New-Item app\dependencies.py
+New-Item app\security.py
+New-Item app\limiter.py
+New-Item app\enums.py
+New-Item app\models\__init__.py
+New-Item app\schemas\__init__.py
+New-Item app\routers\__init__.py
+New-Item app\services\__init__.py
+New-Item app\middlewares\__init__.py
+1.6 — Creezi fișierele de configurare la rădăcina proiectului
+powershell
+New-Item .env
+New-Item .env.example
+New-Item .gitignore
+New-Item pyproject.toml
+New-Item requirements.txt
+New-Item README.md
+1.7 — Completezi .gitignore
+
+Deschizi .gitignore (în VS Code sau orice editor) și pui:
+
+venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+*.egg-info/
+.vscode/
+.idea/
+alembic.ini.bak
