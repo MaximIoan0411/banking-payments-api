@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.security import oauth2_scheme, decode_token
 from app.models.user import User
+from app.models.account import Account
 
 
 async def get_db():
@@ -57,3 +58,13 @@ async def get_current_admin(
             detail="Nu ai permisiunea necesară pentru această acțiune",
         )
     return current_user
+
+async def get_current_account(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Account:
+    result = await db.execute(select(Account).where(Account.user_id == current_user.id))
+    account = result.scalar_one_or_none()
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cont inexistent")
+    return account
