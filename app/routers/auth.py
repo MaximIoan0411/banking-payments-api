@@ -33,7 +33,8 @@ def _generate_account_number() -> str:
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(user_in: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit("3/minute")
+async def register(request: Request, user_in: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(User).where(User.email == user_in.email))
     if result.scalar_one_or_none() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Există deja un cont cu acest email")
