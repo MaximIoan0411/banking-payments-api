@@ -1,0 +1,6 @@
+name: banking-local
+values:
+  - key: base_url
+    value: ''
+  - key: webhook_secret
+    value: ''

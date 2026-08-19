@@ -1,0 +1,32 @@
+$kind: http-request
+name: payment-confirmation
+description: ""
+url: "{{base_url}}/webhooks/payment-confirmation"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"event_id\": \"evt_mismatch_001\",\r
+
+    \  \"event_type\": \"payment.succeeded\",\r
+
+    \  \"transaction_id\": \"51dc8bc9-aa18-48f0-a8bb-8468adbbb54a\",\r
+
+    \  \"amount\": \"999.00\"\r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: ""
+    language: text/javascript
+  - type: beforeRequest
+    code: "const secret = pm.environment.get(\"webhook_secret\");\r
+
+      const body = pm.request.body.raw;\r
+
+      const hash = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);\r
+
+      pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: `sha256=${hash}` });"
+    language: text/javascript
+order: 1787134235453
