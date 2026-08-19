@@ -11,6 +11,7 @@ from app.security import oauth2_scheme, decode_token
 from app.models.user import User
 from app.models.account import Account
 
+from sqlalchemy.orm import selectinload
 
 async def get_db():
     async with AsyncSessionLocal() as session:

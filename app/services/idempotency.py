@@ -53,8 +53,11 @@ async def reserve_idempotency_key(
 
 
 async def finalize_idempotency_key(
-    db: AsyncSession, entry: IdempotencyKey, status_code: int, response_body: str
+    db: AsyncSession, entry_id: uuid.UUID, status_code: int, response_body: str
 ) -> None:
+    entry = await db.get(IdempotencyKey, entry_id)
+    if entry is None:
+        return
     entry.status_code = status_code
     entry.response_body = response_body
     await db.commit()
