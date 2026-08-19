@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_account, get_db
@@ -13,6 +13,10 @@ from app.services.idempotency import (
     reserve_idempotency_key,
 )
 from app.services.payments import execute_deposit, execute_payment, get_account_by_number
+
+from sqlalchemy import select
+
+from app.models.transaction import Transaction
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -83,3 +87,20 @@ async def create_payment(
     response = TransactionOut.model_validate(transaction)
     await finalize_idempotency_key(db, entry_id, status.HTTP_201_CREATED, response.model_dump_json())
     return response
+
+@router.get("", response_model=list[TransactionOut])
+async def list_my_transactions(
+    account: Annotated[Account, Depends(get_current_account)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    account_id = account.id
+    result = await db.execute(
+        select(Transaction)
+        .where(Transaction.account_id == account_id)
+        .order_by(Transaction.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return result.scalars().all()

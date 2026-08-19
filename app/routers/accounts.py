@@ -9,6 +9,6 @@ from app.schemas.account import AccountOut
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
-@router.get("/me/balance", response_model=AccountOut)
+@router.get("/me", response_model=AccountOut)
 async def get_my_balance(account: Annotated[Account, Depends(get_current_account)]):
     return account

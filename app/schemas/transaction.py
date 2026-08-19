@@ -22,6 +22,7 @@ class TransactionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    account_id: uuid.UUID
     type: TransactionType
     status: TransactionStatus
     amount: Decimal

@@ -69,3 +69,13 @@ async def get_current_account(
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cont inexistent")
     return account
+
+
+async def get_account_or_404(
+    account_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Account:
+    account = await db.get(Account, account_id)
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cont inexistent")
+    return account
