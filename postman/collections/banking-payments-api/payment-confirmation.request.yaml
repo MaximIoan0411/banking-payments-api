@@ -7,11 +7,11 @@ body:
   type: json
   content: "{\r
 
-    \  \"event_id\": \"evt_mismatch_001\",\r
+    \  \"event_id\": \"evt_mismatch_002\",\r
 
     \  \"event_type\": \"payment.succeeded\",\r
 
-    \  \"transaction_id\": \"51dc8bc9-aa18-48f0-a8bb-8468adbbb54a\",\r
+    \  \"transaction_id\": \"51dc8bc9-aa18-48f0-a8bb-8468adbbb54b\",\r
 
     \  \"amount\": \"999.00\"\r
 
