@@ -105,6 +105,7 @@ async def funded_sender(client):
     return {"headers": headers, "account_number": account.json()["account_number"]}
 
 
+
 @pytest_asyncio.fixture
 async def recipient(client):
     await client.post("/auth/register", json={
